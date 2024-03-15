@@ -7,10 +7,17 @@ cfg_if::cfg_if! {
     } else {}
 
 }
+cfg_if::cfg_if! {
+    if  #[cfg(feature = "oauth2")]{
+        use axum::Router as AxumRouter;
+        use crate::oauth2_store::OAuth2ClientStore;
+        use axum::extract::FromRef;
+        use axum_extra::extract::cookie::Key;
+    }else { }
+}
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use axum::Router as AxumRouter;
 
 #[cfg(feature = "channels")]
 use crate::controller::channels::AppChannels;
@@ -48,6 +55,12 @@ pub struct AppContext {
     pub mailer: Option<EmailSender>,
     // Ab optional storage instance for the application
     pub storage: Option<Arc<Storage>>,
+    // An optional oauth2 client
+    #[cfg(feature = "oauth2")]
+    pub oauth2: Option<Arc<OAuth2ClientStore>>,
+    // An optional key for use with Signed and/or Private jars
+    #[cfg(feature = "oauth2")]
+    pub key: Key,
 }
 
 /// A trait that defines hooks for customizing and extending the behavior of a
@@ -162,7 +175,14 @@ pub trait Hooks {
     ) -> Result<Option<Storage>> {
         Ok(None)
     }
-
+    /// Defines the OAuth2 configuration for the application
+    #[cfg(feature = "oauth2")]
+    async fn oauth2(
+        _config: &config::Config,
+        _environment: &Environment,
+    ) -> Result<Option<OAuth2ClientStore>> {
+        Ok(None)
+    }
     #[cfg(feature = "channels")]
     /// Register channels endpoints to the application routers
     fn register_channels(_ctx: &AppContext) -> AppChannels;
@@ -206,5 +226,14 @@ pub trait Initializer: Sync + Send {
     /// Router
     async fn after_routes(&self, router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         Ok(router)
+    }
+}
+
+// implementing FromRef is required here so we can extract substate in Axum
+// read more here: https://docs.rs/axum/latest/axum/extract/trait.FromRef.html
+#[cfg(feature = "oauth2")]
+impl FromRef<AppContext> for Key {
+    fn from_ref(state: &AppContext) -> Self {
+        state.key.clone()
     }
 }
