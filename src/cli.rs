@@ -32,6 +32,7 @@ use crate::{
         create_app, create_context, list_endpoints, run_task, start, RunDbCommand, ServeParams,
         StartMode,
     },
+    config::Config,
     environment::{resolve_from_env, Environment, DEFAULT_ENVIRONMENT},
     gen::{self, Component},
     logger, task,
@@ -288,9 +289,8 @@ pub async fn main<H: Hooks, M: MigratorTrait>() -> eyre::Result<()> {
     let environment: Environment = cli.environment.unwrap_or_else(resolve_from_env).into();
 
     let config = environment.load()?;
-
     if !H::init_logger(&config, &environment)? {
-        logger::init::<H>(&config.logger);
+        setup_logger::<H>(&config);
     }
 
     let task_span = create_root_span(&environment);
@@ -361,6 +361,23 @@ pub async fn main<H: Hooks, M: MigratorTrait>() -> eyre::Result<()> {
     Ok(())
 }
 
+fn setup_logger<H: Hooks>(config: &Config) {
+    match config.logger.clone() {
+        serde_enabled::Enable::On(logger) => {
+            logger::init::<H>(&logger);
+
+            if logger.pretty_backtrace {
+                std::env::set_var("RUST_BACKTRACE", "1");
+                tracing::warn!(
+                    "pretty backtraces are enabled (this is great for development but has a runtime cost \
+                    for production. disable with `logger.pretty_backtrace` in your config yaml)"
+                );
+            }
+        }
+        serde_enabled::Enable::Off => {}
+    };
+}
+
 #[cfg(not(feature = "with-db"))]
 pub async fn main<H: Hooks>() -> eyre::Result<()> {
     let cli = Cli::parse();
@@ -368,8 +385,9 @@ pub async fn main<H: Hooks>() -> eyre::Result<()> {
 
     let config = environment.load()?;
 
+    let config = environment.load()?;
     if !H::init_logger(&config, &environment)? {
-        logger::init::<H>(&config.logger);
+        setup_logger::<H>(&config);
     }
 
     let task_span = create_root_span(&environment);
