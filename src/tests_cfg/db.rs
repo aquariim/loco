@@ -1,3 +1,9 @@
+use std::path::Path;
+
+use async_trait::async_trait;
+use sea_orm::DatabaseConnection;
+pub use sea_orm_migration::prelude::*;
+
 #[cfg(feature = "channels")]
 use crate::controller::channels::AppChannels;
 use crate::{
@@ -9,12 +15,6 @@ use crate::{
     worker::Processor,
     Result,
 };
-
-use std::path::Path;
-
-use async_trait::async_trait;
-use sea_orm::DatabaseConnection;
-pub use sea_orm_migration::prelude::*;
 
 /// Creating a dummy db connection for docs
 ///
@@ -81,7 +81,7 @@ impl MigratorTrait for Migrator {
 
 pub struct AppHook;
 #[async_trait]
-impl Hooks for AppHook {
+impl Hooks<AppContext> for AppHook {
     fn app_version() -> String {
         "test".to_string()
     }
@@ -94,12 +94,12 @@ impl Hooks for AppHook {
         Ok(vec![])
     }
 
-    fn routes(_ctx: &AppContext) -> AppRoutes {
+    fn routes(_ctx: &AppContext) -> AppRoutes<AppContext> {
         AppRoutes::with_default_routes()
     }
 
-    async fn boot(mode: StartMode, environment: &Environment) -> Result<BootResult> {
-        create_app::<Self, Migrator>(mode, environment).await
+    async fn boot(mode: StartMode, environment: &Environment) -> Result<BootResult<AppContext>> {
+        create_app::<AppContext, Self, Migrator>(mode, environment).await
     }
 
     fn connect_workers<'a>(_p: &'a mut Processor, _ctx: &'a AppContext) {}
