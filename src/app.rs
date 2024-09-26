@@ -9,9 +9,6 @@ cfg_if::cfg_if! {
 }
 use std::{net::SocketAddr, sync::Arc};
 
-use async_trait::async_trait;
-use axum::Router as AxumRouter;
-
 #[cfg(feature = "channels")]
 use crate::controller::channels::AppChannels;
 use crate::{
@@ -26,6 +23,8 @@ use crate::{
     worker::{Pool, Processor, RedisConnectionManager},
     Result,
 };
+use async_trait::async_trait;
+use axum::Router as AxumRouter;
 
 /// Represents the application context for a web server.
 ///
